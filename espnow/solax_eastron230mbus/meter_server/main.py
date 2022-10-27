@@ -1,4 +1,3 @@
-
 import uasyncio as asyncio
 import uos
 
@@ -6,7 +5,7 @@ import _thread
 import machine
 from scrivo import logging
 
-log = logging.getLogger('MAIN')
+log = logging.getLogger("MAIN")
 logging.basicConfig(level=logging.INFO)
 
 
@@ -14,6 +13,7 @@ storage_dir = "."
 # WDT
 async def run_wdt():
     import gc
+
     wdt = machine.WDT(timeout=12000)
     print("WDT RUN")
     while True:
@@ -21,6 +21,7 @@ async def run_wdt():
         gc.collect()
         # print("WDT RESET")
         await asyncio.sleep(5)
+
 
 # Core
 def core():
@@ -38,10 +39,12 @@ def core():
 async def loader():
     try:
         from scrivo_meter_server._runner import Runner
+
         log.info("Module: Run")
         meter = Runner()
     except Exception as e:
         log.error(f"Module: {e}")
+
 
 def main():
 
@@ -58,8 +61,10 @@ def main():
     loop.create_task(loader())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("MAIN")
+
+    print("This device connects to the INVERTER")
+    print("The mac address of this device is 94 b9 7e d9 99 6c")
+    print("This device will connect to 94 b9 7e d9 71 9c")
     main()
-
-

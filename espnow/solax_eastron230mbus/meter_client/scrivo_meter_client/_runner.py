@@ -9,40 +9,46 @@ from machine import UART
 from .crc import check_crc16, calc_crc16
 
 from scrivo import logging
+
 log = logging.getLogger("MODBUS")
 log.setLevel(logging.DEBUG)
 
-def hexh(data,  sep=' '):
+
+def hexh(data, sep=" "):
     try:
-        data = f'{sep}'.join('{:02x}'.format(x) for x in data)
+        data = f"{sep}".join("{:02x}".format(x) for x in data)
     except Exception as e:
         log.debug("error: HEX: {}".format(e))
     return data
 
 
-data_register_master = {
+# this is the register that needs fudging per phase
 
+data_register_master = {
     "deye_chint_1p": {
         "addr": 1,
         "func": 3,
         "start_reg": 8192,
         "qty_reg": 6,
-        "alive": 10000, # 10000 for test - for real devices set: 0
-        "raw": bytearray(b'\x02\x03\x05\x07'),
-        "peer": b'\x29\x6F\x27\x04\x80\x64'  # server MAC address
+        "alive": 10000,  # 10000 for test - for real devices set: 0
+        "raw": bytearray(b"\x02\x03\x05\x07"),
+        "peer": b"\x94\xb9\x7e\xd9\x71\x9c",  # server MAC address
     }
 }
 
 
 class Runner:
-
     def __init__(self):
-        
+
         import network
-        w0 = network.WLAN(network.STA_IF); w0.active(True)
+
+        w0 = network.WLAN(network.STA_IF)
+        w0.active(True)
         w0.config(ps_mode=network.WIFI_PS_NONE)  # ..then disable power saving
-        w0 = network.WLAN(network.STA_IF); w0.active(True); w0.disconnect()
-        w0.config(channel=6)    # Change to the channel.
+        w0 = network.WLAN(network.STA_IF)
+        w0.active(True)
+        w0.disconnect()
+        w0.config(channel=6)  # Change to the channel.
 
         launch(self._activate)
 
@@ -62,10 +68,11 @@ class Runner:
         launch(self.meter_process)
         launch(self.espnow_process)
 
-
     def make_request(self, request):
         quantity = request.qty_reg
-        request_pdu = struct.pack('>BBHH', request.addr, request.func, request.start_reg, quantity)
+        request_pdu = struct.pack(
+            ">BBHH", request.addr, request.func, request.start_reg, quantity
+        )
         # debug
         log.debug(f"  Pdu Reguest : {hexh(request_pdu)}")
 
@@ -87,10 +94,12 @@ class Runner:
         if crc:
             unit_addr = data[0]
             func = data[1]
-            len_data = struct.unpack_from('B', data[2:3])[0]
+            len_data = struct.unpack_from("B", data[2:3])[0]
             raw_data = data[3:-2]
 
-            log.debug(f"  addr: {unit_addr}, reg_addr: {func}={hex(func)}, len_data: {len_data}")
+            log.debug(
+                f"  addr: {unit_addr}, reg_addr: {func}={hex(func)}, len_data: {len_data}"
+            )
             log.debug(f"  data: {hexh(raw_data)}")
             log.debug(" ")
             return True
@@ -106,28 +115,29 @@ class Runner:
                     await self.meter_swriter.awrite(uart_pdu)
 
                     await asyncio.sleep(0.2)
-                    data = b''
+                    data = b""
 
                     # wait for response and read it
                     try:
-                        data = await asyncio.wait_for(self.meter_sreader.read_uart(-1), 1)
+                        data = await asyncio.wait_for(self.meter_sreader.read(-1), 1)
                     except asyncio.TimeoutError:
-                        log.error('Meter got timeout')
+                        log.error("Meter got timeout")
                     # log.info(f" << uart {'Meter'}: {hexh(data)}")
 
-                    if data != b'':
+                    if data != b"":
                         # parse response data
                         val_data = self.parse_response(request, data)
                         if val_data is not None:
                             request.value = val_data
                             request.alive = 10
-                            request.raw = uart_pdu[0:4]+data # reguest addr, func, start_reg, qty_reg + response full.
+                            request.raw = (
+                                uart_pdu[0:4] + data
+                            )  # reguest addr, func, start_reg, qty_reg + response full.
             await asyncio.sleep(0.1)
-
-
 
     async def send_msg(self, peer, msg):
         import time
+
         before = time.ticks_us()
         if not await self.e_lan.asend(peer, msg):
             print("send: False")
@@ -145,10 +155,11 @@ class Runner:
                     try:
                         await self.send_msg(request.peer, request.raw)
                     except OSError as err:
-                        if len(err.args) > 1 and err.args[1] == 'ESP_ERR_ESPNOW_NOT_FOUND':
+                        if (
+                            len(err.args) > 1
+                            and err.args[1] == "ESP_ERR_ESPNOW_NOT_FOUND"
+                        ):
                             self.e_lan.add_peer(request.peer)
                             log.info(f"peers: {self.e_lan.get_peers}")
 
             await asyncio.sleep(0.1)
-
-
